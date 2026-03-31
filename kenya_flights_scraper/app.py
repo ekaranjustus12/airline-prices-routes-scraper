@@ -10,8 +10,9 @@ from pathlib import Path
 # ── Install Playwright browsers at startup (Streamlit Cloud) ──
 @st.cache_resource
 def install_playwright():
+    # --with-deps installs all required OS-level libraries for Chromium
     result = subprocess.run(
-        [sys.executable, "-m", "playwright", "install", "chromium"],
+        [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"],
         capture_output=True, text=True
     )
     if result.returncode != 0:

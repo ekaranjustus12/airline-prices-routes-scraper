@@ -1,83 +1,41 @@
-#!/usr/bin/env bash
-# ── Run this ONCE on your server / local machine ──────────────────────────────
-# Usage:  bash setup.sh
-# ─────────────────────────────────────────────────────────────────────────────
-set -e
+"""
+This module is imported at the very top of app.py to ensure
+Playwright's Chromium browser binary is installed before the
+scraper ever tries to launch it.
 
-echo "=== Installing system dependencies for Playwright/Chromium ==="
+Streamlit Cloud installs Python packages from requirements.txt
+but does NOT run `playwright install` automatically. Without this,
+you get:
+  "Executable doesn't exist at ... run `playwright install`"
 
-# Detect package manager
-if command -v apt-get &>/dev/null; then
-    sudo apt-get update -y
-    sudo apt-get install -y \
-        libglib2.0-0 \
-        libnss3 \
-        libnspr4 \
-        libdbus-1-3 \
-        libatk1.0-0 \
-        libatk-bridge2.0-0 \
-        libcups2 \
-        libdrm2 \
-        libxcomposite1 \
-        libxdamage1 \
-        libxfixes3 \
-        libxrandr2 \
-        libgbm1 \
-        libxkbcommon0 \
-        libpango-1.0-0 \
-        libcairo2 \
-        libasound2 \
-        libatspi2.0-0 \
-        libx11-6 \
-        libx11-xcb1 \
-        libxcb1 \
-        libxext6 \
-        fonts-liberation \
-        wget
-    echo "=== apt-get packages installed ==="
+The install is skipped on subsequent runs because Playwright
+checks for the binary first.
+"""
+import subprocess
+import sys
+import os
 
-elif command -v yum &>/dev/null; then
-    # RHEL / CentOS / Amazon Linux
-    sudo yum install -y \
-        glib2 \
-        nss \
-        nspr \
-        dbus-libs \
-        atk \
-        at-spi2-atk \
-        cups-libs \
-        libdrm \
-        libXcomposite \
-        libXdamage \
-        libXfixes \
-        libXrandr \
-        mesa-libgbm \
-        libxkbcommon \
-        pango \
-        cairo \
-        alsa-lib \
-        at-spi2-core \
-        libX11 \
-        libxcb \
-        libXext
-    echo "=== yum packages installed ==="
-else
-    echo "WARNING: Unknown package manager. Install Chromium system deps manually."
-    echo "See: https://playwright.dev/python/docs/intro#system-requirements"
-fi
+def ensure_playwright_browsers():
+    """Install Playwright's Chromium binary if not already present."""
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            # Just check if the executable exists — don't launch yet
+            browser_path = p.chromium.executable_path
+            if os.path.exists(browser_path):
+                return  # already installed, nothing to do
+    except Exception:
+        pass  # browser not found — fall through to install
 
-echo ""
-echo "=== Installing Python packages ==="
-pip install --upgrade pip
-pip install playwright pandas streamlit
+    print("Installing Playwright Chromium browser...", flush=True)
+    result = subprocess.run(
+        [sys.executable, "-m", "playwright", "install", "chromium"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        print("Playwright Chromium installed successfully.", flush=True)
+    else:
+        print(f"playwright install warning: {result.stderr[:300]}", flush=True)
 
-echo ""
-echo "=== Installing Playwright browsers (Chromium only) ==="
-playwright install chromium
-
-echo ""
-echo "=== Installing Playwright system deps via playwright tool ==="
-playwright install-deps chromium
-
-echo ""
-echo "✅  Setup complete. You can now run:  streamlit run app.py"
+ensure_playwright_browsers()

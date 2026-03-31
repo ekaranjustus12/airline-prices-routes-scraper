@@ -34,29 +34,33 @@ def load_data():
     try:
         df = pd.read_csv(CSV_FILE)
 
-        # Ensure required columns exist
-        required_cols = [
-            "route", "flight_date", "price_kes",
-            "departure_time", "arrival_time"
-        ]
-        for col in required_cols:
+        # Ensure required columns exist with correct defaults
+        required_cols = {
+            "route": "",
+            "flight_date": "",
+            "price_kes": 0,
+            "departure_time": "",
+            "arrival_time": "",
+            "price_usd": 0.0,
+            "stops": 0,
+            "airline": "Unknown",
+        }
+        for col, default in required_cols.items():
             if col not in df.columns:
-                df[col] = ""
+                df[col] = default
 
-        # Clean data
-        df["price_kes"] = pd.to_numeric(df["price_kes"], errors="coerce").fillna(0)
-        df["price_usd"] = pd.to_numeric(df.get("price_usd", 0), errors="coerce").fillna(0)
-        df["stops"] = pd.to_numeric(df.get("stops", 0), errors="coerce").fillna(0)
+        # FIX: use df[col] not df.get(col) — DataFrame.get() returns a
+        # scalar default for missing columns, which breaks pd.to_numeric
+        df["price_kes"] = pd.to_numeric(df["price_kes"], errors="coerce").fillna(0).astype(int)
+        df["price_usd"] = pd.to_numeric(df["price_usd"], errors="coerce").fillna(0.0)
+        df["stops"]     = pd.to_numeric(df["stops"],     errors="coerce").fillna(0).astype(int)
 
-        df["departure_time"] = pd.to_datetime(
-            df["departure_time"], errors="coerce"
-        ).dt.strftime("%H:%M")
+        # FIX: departure/arrival are stored as bare "HH:MM" strings in the CSV.
+        # pd.to_datetime("14:30") returns NaT — just clean them as strings instead.
+        df["departure_time"] = df["departure_time"].astype(str).str.strip().replace("nan", "")
+        df["arrival_time"]   = df["arrival_time"].astype(str).str.strip().replace("nan", "")
 
-        df["arrival_time"] = pd.to_datetime(
-            df["arrival_time"], errors="coerce"
-        ).dt.strftime("%H:%M")
-
-        df["flight_date"] = df["flight_date"].astype(str)
+        df["flight_date"] = df["flight_date"].astype(str).str.strip()
 
         return df
 
@@ -82,11 +86,12 @@ def run_scraper():
                 cwd=str(BASE_DIR)
             )
 
-            # Show logs (important for debugging)
             if result.stdout:
-                st.text(result.stdout[-1000:])
+                st.text(result.stdout[-1500:])
 
-            # Instead of relying on returncode → check file
+            if result.stderr:
+                st.text("Stderr: " + result.stderr[-500:])
+
             if CSV_FILE.exists() and os.path.getsize(CSV_FILE) > 0:
                 st.cache_data.clear()
                 st.success("Flights updated!")
@@ -133,18 +138,31 @@ route_label = route_info["label"]
 date_str = str(selected_date)
 
 if not df.empty:
+    # FIX: was `>= date_str` which returned all future dates regardless
+    # of what the user selected. Use == to match the chosen date only.
     filtered = df[
         (df["route"] == route_label) &
-        (df["flight_date"] >= date_str)
+        (df["flight_date"] == date_str)
     ].sort_values("price_kes")
 else:
     filtered = pd.DataFrame()
 
 # ── Display results ───────────────────────────────────
 if filtered.empty:
-    st.warning("No flights found. Click 'Fetch flights' to load data.")
+    if df.empty:
+        st.warning("No data yet. Click '🔄 Fetch flights' to load data.")
+    else:
+        # Show which dates DO have data for this route, to help the user
+        route_dates = df[df["route"] == route_label]["flight_date"].unique()
+        if len(route_dates):
+            st.warning(
+                f"No flights for {route_label} on {date_str}. "
+                f"Available dates: {', '.join(sorted(route_dates))}"
+            )
+        else:
+            st.warning(f"No flights found for {route_label}. Click '🔄 Fetch flights'.")
 else:
-    st.success(f"{len(filtered)} flights found")
+    st.success(f"{len(filtered)} flight(s) found for {route_label} on {date_str}")
 
     cheapest = filtered["price_kes"].min()
 
@@ -159,14 +177,14 @@ else:
                 st.caption(row.get("flight_date", ""))
 
             with colB:
-                st.markdown(
-                    f"{row.get('departure_time','--')} → {row.get('arrival_time','--')}"
-                )
+                dep = row.get("departure_time", "") or "--"
+                arr = row.get("arrival_time", "") or "--"
+                st.markdown(f"{dep} → {arr}")
                 stops = int(row.get("stops", 0))
                 st.caption("Direct" if stops == 0 else f"{stops} stop(s)")
 
             with colC:
-                st.markdown(f"**KES {int(row.get('price_kes',0)):,}**")
+                st.markdown(f"**KES {int(row.get('price_kes', 0)):,}**")
                 if is_best:
                     st.caption("✅ Best price")
 

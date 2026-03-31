@@ -1,25 +1,9 @@
 import streamlit as st
 import pandas as pd
-import subprocess
-import sys
 import time
 import os
 from datetime import date, timedelta
 from pathlib import Path
-
-# ── Install Playwright browser binary at startup ──────────
-# OS-level libs are handled by packages.txt + setup.sh (run as root).
-# Here we only install the Chromium binary — no sudo required.
-@st.cache_resource
-def install_playwright():
-    result = subprocess.run(
-        [sys.executable, "-m", "playwright", "install", "chromium"],
-        capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        st.warning(f"Playwright install warning: {result.stderr[-300:]}")
-
-install_playwright()
 
 st.set_page_config(
     page_title="Kenya Flights",

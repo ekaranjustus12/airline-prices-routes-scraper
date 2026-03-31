@@ -95,9 +95,11 @@ if st.button("🔄 Fetch Latest Flights"):
         if result.returncode == 0:
             st.success("✅ Flights updated successfully!")
         else:
-            st.error("❌ Scraper failed")
+            st.error("❌ Scraper failed — check logs below 👇")
 
-        # Logs (VERY IMPORTANT)
+        st.write("Return code:", result.returncode)
+
+        # ✅ SHOW LOGS HERE (inside block)
         with st.expander("📄 Scraper Logs"):
             st.text(result.stdout)
             st.text(result.stderr)
@@ -174,6 +176,5 @@ if refresh:
     st.rerun()
 
 # ── Footer ─────────────────────────────────────────────
-st.write("STDOUT:", result.stdout)
-st.write("STDERR:", result.stderr)
+
 st.caption(f"Last updated: {time.strftime('%H:%M:%S')}")

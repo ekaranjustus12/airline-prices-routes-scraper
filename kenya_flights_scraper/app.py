@@ -174,4 +174,6 @@ if refresh:
     st.rerun()
 
 # ── Footer ─────────────────────────────────────────────
+st.write("STDOUT:", result.stdout)
+st.write("STDERR:", result.stderr)
 st.caption(f"Last updated: {time.strftime('%H:%M:%S')}")

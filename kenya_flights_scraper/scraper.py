@@ -13,7 +13,8 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 
 # ── Config ────────────────────────────────────────────
-CSV_FILE    = Path("kenya_flights_esky.csv")
+BASE_DIR    = Path(__file__).parent
+CSV_FILE    = BASE_DIR / "kenya_flights_esky.csv"
 USD_TO_KES  = 130
 DEBUG       = False
 MAX_DAYS    = 7

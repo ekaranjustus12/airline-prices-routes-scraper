@@ -7,12 +7,13 @@ import os
 from datetime import date, timedelta
 from pathlib import Path
 
-# ── Install Playwright browsers at startup (Streamlit Cloud) ──
+# ── Install Playwright browser binary at startup ──────────
+# OS-level libs are handled by packages.txt + setup.sh (run as root).
+# Here we only install the Chromium binary — no sudo required.
 @st.cache_resource
 def install_playwright():
-    # --with-deps installs all required OS-level libraries for Chromium
     result = subprocess.run(
-        [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"],
+        [sys.executable, "-m", "playwright", "install", "chromium"],
         capture_output=True, text=True
     )
     if result.returncode != 0:

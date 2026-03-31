@@ -12,8 +12,9 @@ st.set_page_config(
 )
 
 # ── Constants ─────────────────────────────────────────
-# On Streamlit Cloud, use a local CSV file (no Google Drive)
-CSV_FILE = Path("kenya_flights_esky.csv")
+# Use the directory where app.py lives — works on Streamlit Cloud
+BASE_DIR = Path(__file__).parent
+CSV_FILE  = BASE_DIR / "kenya_flights_esky.csv"
 
 ROUTES = {
     "Nairobi → Mombasa": {"label": "NBO→MBA", "from": "NBO", "to": "MBA"},
@@ -256,10 +257,12 @@ def render_card(row, is_best: bool, route_info: dict):
 def run_scraper():
     """Run the scraper as a subprocess and reload data."""
     import subprocess, sys
+    scraper_path = BASE_DIR / "scraper.py"
     with st.spinner("Scraping latest flights... this may take 1–2 minutes."):
         result = subprocess.run(
-            [sys.executable, "scraper.py"],
-            capture_output=True, text=True, timeout=180
+            [sys.executable, str(scraper_path)],
+            capture_output=True, text=True, timeout=180,
+            cwd=str(BASE_DIR)
         )
     if result.returncode == 0:
         st.cache_data.clear()

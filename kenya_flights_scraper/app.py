@@ -126,4 +126,3 @@ if refresh:
     st.rerun()
 
 st.caption(f"Last updated: {time.strftime('%H:%M:%S')}")
-'''

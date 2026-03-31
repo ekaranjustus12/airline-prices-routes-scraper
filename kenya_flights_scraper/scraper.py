@@ -1,23 +1,26 @@
 """
-scraper.py  —  Standalone flight scraper (no Colab / Google Drive dependencies)
+scraper.py  —  Flight scraper using httpx (no browser / no Playwright needed)
+Calls eSky's internal JSON API directly, with session cookie warm-up.
 Run directly:  python scraper.py
 Called by app.py via subprocess when user clicks "Fetch flights".
 """
 
-import asyncio
-import re
 import sys
+import time
+import random
+import re
+import json
+import httpx
 import pandas as pd
 from datetime import date, timedelta
 from pathlib import Path
-from playwright.async_api import async_playwright
 
 # ── Config ────────────────────────────────────────────
-BASE_DIR    = Path(__file__).parent
-CSV_FILE    = BASE_DIR / "kenya_flights_esky.csv"
-USD_TO_KES  = 130
-DEBUG       = False
-MAX_DAYS    = 7
+BASE_DIR   = Path(__file__).parent
+CSV_FILE   = BASE_DIR / "kenya_flights_esky.csv"
+USD_TO_KES = 130
+MAX_DAYS   = 7
+DEBUG      = False
 
 SEARCHES = [
     {"from_code": "NAIR", "to_code": "MBA", "label": "NBO→MBA"},
@@ -25,320 +28,247 @@ SEARCHES = [
     {"from_code": "NAIR", "to_code": "EDL", "label": "NBO→EDL"},
 ]
 
-
-# ── URL builder ───────────────────────────────────────
-def search_url(search: dict, flight_date: str) -> str:
-    return (
-        f"https://www.esky.co.ke/flights/search/mp/{search['from_code']}"
-        f"/ap/{search['to_code']}"
-        f"?departureDate={flight_date}"
-        f"&sc=economy&pa=1&py=0&pc=0&pi=0&flexDatesOffset=0"
-    )
-
-
-# ── Stealth JS ────────────────────────────────────────
-STEALTH_JS = """
-    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    window.chrome = { runtime: {} };
-    Object.defineProperty(navigator, 'plugins',   { get: () => [1, 2, 3] });
-    Object.defineProperty(navigator, 'languages', { get: () => ['en-KE', 'en'] });
-"""
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/122.0.0.0 Safari/537.36"
+    ),
+    "Accept":          "application/json, text/plain, */*",
+    "Accept-Language": "en-KE,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Referer":         "https://www.esky.co.ke/",
+    "Origin":          "https://www.esky.co.ke",
+    "Connection":      "keep-alive",
+}
 
 
-# ── Session warm-up ───────────────────────────────────
-async def warm_up_session(context):
-    print("Warming up session...")
-    page = await context.new_page()
-    try:
-        await page.goto("https://www.esky.co.ke", wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(4000)
-        print("  Session ready ✓")
-    except Exception as e:
-        print(f"  Warm-up warning: {e}")
-    finally:
-        await page.close()
-
-
-# ── Fetch one date ────────────────────────────────────
-async def fetch_for_date(context, search: dict, flight_date: str) -> list:
-    captured = []
-    page     = await context.new_page()
-    await context.add_init_script(STEALTH_JS)
-
-    async def on_response(response):
-        if response.status != 200:
-            return
-        ct = response.headers.get("content-type", "")
-        if "application/json" not in ct:
-            return
-        try:
-            data = await response.json()
-            if not isinstance(data, dict) or not data:
-                return
-            if DEBUG:
-                print(f"    [API] {response.url[:95]}")
-                print(f"          keys: {list(data.keys())[:10]}")
-            for k in ["blocks", "itineraries", "results", "offers", "flights",
-                      "items", "searchResults", "flightOffers", "propositions", "data"]:
-                if k in data and isinstance(data[k], list) and data[k]:
-                    print(f"  key='{k}'  ({len(data[k])} items)")
-                    captured.append({"data": data, "key": k})
-                    break
-        except Exception as e:
-            if DEBUG:
-                print(f"    [json err] {e}")
-
-    page.on("response", on_response)
-
-    url = search_url(search, flight_date)
-    print(f"GET {url}")
-
-    try:
-        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-    except Exception as e:
-        print(f"  Nav error: {e}")
-
-    for i in range(23):
-        if captured:
-            print(f"  JSON arrived ~{(i+1)*2}s")
-            break
-        await page.wait_for_timeout(2000)
-    else:
-        print("  No JSON after 46 s — trying HTML scrape...")
-
-    flights = []
-    if captured:
-        flights = parse_json(captured, search, flight_date)
-    if not flights:
-        flights = await scrape_html(page, search, flight_date)
-
-    if not flights and DEBUG:
-        print(f"  Final URL : {page.url}")
-        print(f"  Title     : {await page.title()}")
-        html = await page.content()
-        print(f"  HTML[:900]: {html[:900]}")
-
-    await page.close()
-    return flights
-
-
-# ── JSON parser ───────────────────────────────────────
-def parse_json(captured: list, search: dict, flight_date: str) -> list:
-    flights   = []
-    today_str = str(date.today())
-
-    for cap in captured:
-        data     = cap["data"]
-        key      = cap["key"]
-        carriers = data.get("dictionaries", {}).get("carriers", {})
-
-        for block in data.get(key, []):
-            try:
-                pd_ = block.get("priceDetails") or block.get("price") or {}
-                if isinstance(pd_, dict):
-                    price_usd = pd_.get("amount") or pd_.get("total") or pd_.get("value")
-                else:
-                    price_usd = float(pd_) if pd_ else None
-                price_usd = price_usd or block.get("totalPrice") or block.get("fare")
-                if price_usd is None:
-                    continue
-                price_usd = float(price_usd)
-                price_kes = int(price_usd * USD_TO_KES)
-
-                for group in (block.get("legGroups") or block.get("legs") or []):
-                    codes   = group.get("airlineCodes", [])
-                    airline = " + ".join(
-                        carriers.get(c, {}).get("name", c)
-                        if isinstance(carriers.get(c), dict) else carriers.get(c, c)
-                        for c in codes
-                    ) or group.get("airline", "Unknown")
-
-                    for leg in group.get("legs", [group]):
-                        dep = leg.get("from", {})
-                        arr = leg.get("to",   {})
-                        flights.append({
-                            "date_scraped":   today_str,
-                            "flight_date":    flight_date,
-                            "route":          search["label"],
-                            "departure_time": dep.get("time") or dep.get("dateTime", ""),
-                            "arrival_time":   arr.get("time") or arr.get("dateTime", ""),
-                            "duration_mins":  leg.get("duration") or group.get("duration", ""),
-                            "airline":        airline,
-                            "stops":          group.get("transferCount", 0),
-                            "price_usd":      price_usd,
-                            "price_kes":      price_kes,
-                        })
-            except Exception as e:
-                if DEBUG:
-                    print(f"    [block err] {e}")
-    return flights
-
-
-# ── HTML fallback ─────────────────────────────────────
-async def scrape_html(page, search: dict, flight_date: str) -> list:
-    flights   = []
-    today_str = str(date.today())
-
-    await page.wait_for_timeout(6000)
-
-    selectors = [
-        "[data-testid*='flight']",
-        "[class*='SearchResults']",
-        "[class*='FlightResult']",
-        "[class*='result-item']",
-        "[class*='offer-item']",
-        "[class*='flight-item']",
-        "[class*='result']:not(body):not(html)",
-    ]
-    cards = []
-    for sel in selectors:
-        cards = await page.query_selector_all(sel)
-        if cards:
-            print(f"  HTML: {len(cards)} cards via '{sel}'")
-            break
-    else:
-        print("  HTML: no cards found")
-        return flights
-
-    known_airlines = [
-        "Kenya Airways", "KQ", "Jambojet", "Skyward Express",
-        "FlySax", "Safarilink", "AirKenya", "African Express",
+# ── URLs to attempt ───────────────────────────────────
+def all_urls(search: dict, flight_date: str) -> list:
+    f, t, d = search["from_code"], search["to_code"], flight_date
+    return [
+        # JSON API variants
+        (f"https://www.esky.co.ke/api/v1/flights/search"
+         f"?from={f}&to={t}&departureDate={d}"
+         f"&adults=1&children=0&infants=0&cabinClass=economy&currency=USD&locale=en-KE"),
+        (f"https://www.esky.co.ke/flights/api/search"
+         f"?from={f}&to={t}&date={d}&adults=1&cabin=economy"),
+        (f"https://www.esky.co.ke/api/flights"
+         f"?originLocationCode={f}&destinationLocationCode={t}"
+         f"&departureDate={d}&adults=1&travelClass=ECONOMY&currencyCode=USD&max=20"),
+        (f"https://www.esky.co.ke/proxy/flights/offers/search"
+         f"?originDestinations={f}-{t}-{d}&travelers=1ADT&sources=GDS&currency=USD"),
+        # HTML page (contains embedded JSON state)
+        (f"https://www.esky.co.ke/flights/search/mp/{f}/ap/{t}"
+         f"?departureDate={d}&sc=economy&pa=1&py=0&pc=0&pi=0&flexDatesOffset=0"),
     ]
 
-    seen_prices = set()
 
-    for card in cards:
+# ── JSON response parser ──────────────────────────────
+def parse_response(data: dict, search: dict, flight_date: str) -> list:
+    flights   = []
+    today_str = str(date.today())
+    carriers  = data.get("dictionaries", {}).get("carriers", {})
+
+    rows = []
+    for k in ["blocks", "itineraries", "results", "offers", "flights",
+              "items", "searchResults", "flightOffers", "propositions",
+              "data", "content", "flightOptions"]:
+        val = data.get(k)
+        if isinstance(val, list) and val:
+            rows = val
+            if DEBUG:
+                print(f"  key='{k}'  {len(rows)} items")
+            break
+
+    for block in rows:
+        if not isinstance(block, dict):
+            continue
         try:
-            text = (await card.inner_text()).strip()
-            if len(text) < 10:
-                continue
-
-            price_usd = None
-            m = re.search(r'US\$\s*([\d,]+(?:\.\d+)?)', text)
-            if m:
-                price_usd = float(m.group(1).replace(",", ""))
+            pd_ = block.get("priceDetails") or block.get("price") or {}
+            if isinstance(pd_, dict):
+                price_usd = (pd_.get("grandTotal") or pd_.get("total")
+                             or pd_.get("amount") or pd_.get("value"))
             else:
-                m = re.search(r'KES\s*([\d,]+)', text)
-                if m:
-                    price_usd = float(m.group(1).replace(",", "")) / USD_TO_KES
+                price_usd = float(pd_) if pd_ else None
+            price_usd = price_usd or block.get("totalPrice") or block.get("fare")
             if price_usd is None:
                 continue
+            price_usd = float(price_usd)
+            price_kes = int(price_usd * USD_TO_KES)
 
-            key_sig = (round(price_usd, 0), text[:40])
-            if key_sig in seen_prices:
-                continue
-            seen_prices.add(key_sig)
+            itineraries = (block.get("legGroups") or block.get("legs")
+                           or block.get("itineraries") or [block])
 
-            times = re.findall(r'\b([0-2]?\d:[0-5]\d)\b', text)
+            for group in itineraries:
+                codes   = group.get("airlineCodes", [])
+                carrier = group.get("carrierCode", "")
+                airline = (
+                    " + ".join(carriers.get(c, {}).get("name", c)
+                               if isinstance(carriers.get(c), dict)
+                               else carriers.get(c, c) for c in codes)
+                    or carriers.get(carrier, {}).get("name", carrier)
+                    or group.get("airline", "Unknown")
+                )
+                segments = group.get("legs") or group.get("segments") or [group]
+                stops    = group.get("transferCount", max(0, len(segments) - 1))
+                first, last = segments[0], segments[-1]
 
-            dur = ""
-            m = re.search(r'(\d+)\s*h\s*(\d+)\s*m', text, re.I)
-            if m:
-                dur = int(m.group(1)) * 60 + int(m.group(2))
+                dep = (first.get("from", {}).get("time")
+                       or first.get("from", {}).get("dateTime")
+                       or first.get("departure", {}).get("at", ""))
+                arr = (last.get("to", {}).get("time")
+                       or last.get("to", {}).get("dateTime")
+                       or last.get("arrival", {}).get("at", ""))
+                dur = group.get("duration") or group.get("duration_mins", "")
 
-            airline = next(
-                (a for a in known_airlines if a.lower() in text.lower()),
-                "Unknown"
-            )
+                flights.append({
+                    "date_scraped":   today_str,
+                    "flight_date":    flight_date,
+                    "route":          search["label"],
+                    "departure_time": dep,
+                    "arrival_time":   arr,
+                    "duration_mins":  dur,
+                    "airline":        airline,
+                    "stops":          stops,
+                    "price_usd":      round(price_usd, 2),
+                    "price_kes":      price_kes,
+                })
+        except Exception as e:
+            if DEBUG:
+                print(f"  [block err] {e}")
+    return flights
 
-            stops = 0
-            m = re.search(r'(\d+)\s+stop', text, re.I)
-            if m:
-                stops = int(m.group(1))
-            elif re.search(r'\bdirect\b|\bnonstop\b', text, re.I):
-                stops = 0
 
-            flights.append({
-                "date_scraped":   today_str,
-                "flight_date":    flight_date,
-                "route":          search["label"],
-                "departure_time": times[0] if len(times) > 0 else "",
-                "arrival_time":   times[1] if len(times) > 1 else "",
-                "duration_mins":  dur,
-                "airline":        airline,
-                "stops":          stops,
-                "price_usd":      round(price_usd, 2),
-                "price_kes":      int(price_usd * USD_TO_KES),
-            })
+# ── HTML embedded-JSON extractor ──────────────────────
+def parse_html(html: str, search: dict, flight_date: str) -> list:
+    patterns = [
+        r'window\.__INITIAL_STATE__\s*=\s*(\{.+?\})\s*;?\s*</script>',
+        r'window\.__data\s*=\s*(\{.+?\})\s*;',
+        r'"flightOffers"\s*:\s*(\[.+?\])',
+        r'"results"\s*:\s*(\[.+?\])',
+        r'"blocks"\s*:\s*(\[.+?\])',
+    ]
+    for pat in patterns:
+        m = re.search(pat, html, re.DOTALL)
+        if not m:
+            continue
+        try:
+            blob = json.loads(m.group(1))
+            if isinstance(blob, list):
+                blob = {"results": blob}
+            result = parse_response(blob, search, flight_date)
+            if result:
+                return result
         except Exception:
             continue
 
+    # Last-resort: regex visible prices
+    flights   = []
+    today_str = str(date.today())
+    seen      = set()
+    known_airlines = ["Kenya Airways", "Jambojet", "Skyward Express",
+                      "FlySax", "Safarilink", "AirKenya", "African Express"]
+
+    for m in re.finditer(r'US\$\s*([\d,]+(?:\.\d+)?)', html):
+        price_usd = float(m.group(1).replace(",", ""))
+        key = round(price_usd)
+        if key in seen:
+            continue
+        seen.add(key)
+        ctx     = html[max(0, m.start()-300): m.end()+200]
+        times   = re.findall(r'\b([0-2]?\d:[0-5]\d)\b', ctx)
+        airline = next((a for a in known_airlines if a.lower() in ctx.lower()), "Unknown")
+        dur_m   = re.search(r'(\d+)\s*h\s*(\d+)\s*m', ctx, re.I)
+        dur     = int(dur_m.group(1))*60 + int(dur_m.group(2)) if dur_m else ""
+        flights.append({
+            "date_scraped":   today_str,
+            "flight_date":    flight_date,
+            "route":          search["label"],
+            "departure_time": times[0] if times else "",
+            "arrival_time":   times[1] if len(times) > 1 else "",
+            "duration_mins":  dur,
+            "airline":        airline,
+            "stops":          0,
+            "price_usd":      round(price_usd, 2),
+            "price_kes":      int(price_usd * USD_TO_KES),
+        })
     return flights
 
 
-# ── Route loop ────────────────────────────────────────
-async def fetch_route_with_fallback(context, search: dict) -> list:
-    print(f"\n{'='*58}")
-    print(f"  Route: {search['label']}")
-    print(f"{'='*58}")
+# ── Fetch one date ────────────────────────────────────
+def fetch_for_date(client: httpx.Client, search: dict, flight_date: str) -> list:
+    for url in all_urls(search, flight_date):
+        try:
+            if DEBUG:
+                print(f"  GET {url[:100]}")
+            resp = client.get(url, timeout=30)
+            if DEBUG:
+                print(f"  -> {resp.status_code}  ct={resp.headers.get('content-type','')[:60]}")
+            if resp.status_code != 200:
+                continue
+            ct = resp.headers.get("content-type", "")
+            if "application/json" in ct:
+                data    = resp.json()
+                if isinstance(data, list):
+                    data = {"results": data}
+                flights = parse_response(data, search, flight_date)
+            else:
+                flights = parse_html(resp.text, search, flight_date)
+            if flights:
+                print(f"  Found {len(flights)} flights")
+                return flights
+        except Exception as e:
+            if DEBUG:
+                print(f"  [err] {e}")
+        time.sleep(random.uniform(1.5, 3.0))
+    return []
 
+
+# ── Route loop ────────────────────────────────────────
+def fetch_route(client: httpx.Client, search: dict) -> list:
+    print(f"\n{'='*56}\n  Route: {search['label']}\n{'='*56}")
     for offset in range(MAX_DAYS + 1):
         flight_date = (date.today() + timedelta(days=offset)).strftime("%Y-%m-%d")
-        tag = "today" if offset == 0 else f"today+{offset}"
-        print(f"\n  {flight_date}  ({tag})")
-
-        flights = await fetch_for_date(context, search, flight_date)
-
+        print(f"\n  {flight_date}  ({'today' if offset==0 else f'today+{offset}'})")
+        flights = fetch_for_date(client, search, flight_date)
         if flights:
-            print(f"  {len(flights)} flight(s) found for {flight_date}")
             return flights
-
-        print(f"  Nothing for {flight_date} — trying next day...")
-        await asyncio.sleep(3)
-
-    print(f"  No data found for {search['label']} over {MAX_DAYS+1} days")
+        print(f"  Nothing — trying next day...")
+        time.sleep(random.uniform(2, 4))
+    print(f"  No data for {search['label']} over {MAX_DAYS+1} days")
     return []
 
 
 # ── Main ──────────────────────────────────────────────
-async def run():
+def run():
     all_flights = []
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled",
-            ]
-        )
-        context = await browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/122.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1280, "height": 800},
-            locale="en-KE",
-        )
-
-        await warm_up_session(context)
-        print(f"\n{len(SEARCHES)} route(s) | up to {MAX_DAYS} days ahead per route\n")
+    with httpx.Client(headers=HEADERS, follow_redirects=True, timeout=30) as client:
+        print("Warming up session...")
+        try:
+            client.get("https://www.esky.co.ke", timeout=15)
+            time.sleep(2)
+            print("  Session ready")
+        except Exception as e:
+            print(f"  Warm-up warning: {e}")
 
         for search in SEARCHES:
-            flights = await fetch_route_with_fallback(context, search)
+            flights = fetch_route(client, search)
             all_flights.extend(flights)
-            await asyncio.sleep(8)
-
-        await browser.close()
+            time.sleep(random.uniform(3, 6))
 
     df = pd.DataFrame(all_flights)
-
     if not df.empty:
         df.to_csv(CSV_FILE, index=False)
-        print(f"\nSaved {len(df)} rows → {CSV_FILE}\n")
+        print(f"\nSaved {len(df)} rows -> {CSV_FILE}")
         cols = ["route", "flight_date", "airline", "departure_time",
                 "arrival_time", "stops", "price_kes"]
-        print(
-            df.sort_values(["route", "price_kes"])[
-                [c for c in cols if c in df.columns]
-            ].to_string(index=False)
-        )
+        print(df.sort_values(["route", "price_kes"])[
+            [c for c in cols if c in df.columns]].to_string(index=False))
     else:
         print("\nNo flights scraped.")
         sys.exit(1)
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    run()

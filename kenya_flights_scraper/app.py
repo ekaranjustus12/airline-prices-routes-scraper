@@ -34,13 +34,15 @@ if "last_run_status" not in st.session_state:
     st.session_state["last_run_status"] = None
 
 # ── Scraper Runner ──────────────────────────────────────
+SCRAPER_PATH = BASE_DIR / "scraper.py"
+
 def run_scraper(route_label, selected_date):
     env = os.environ.copy()
     env["SCRAPE_ROUTE"] = route_label
     env["SCRAPE_DATE"] = str(selected_date)
 
     result = subprocess.run(
-        [sys.executable, "scraper.py"],
+        [sys.executable, str(SCRAPER_PATH)],  # ✅ FIXED PATH
         capture_output=True,
         text=True,
         env=env

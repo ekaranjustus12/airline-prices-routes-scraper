@@ -1,4 +1,4 @@
-import install_playwright  # noqa: F401 — must be first line
+import install_playwright  # must be first line
 
 import streamlit as st
 import pandas as pd
@@ -26,6 +26,13 @@ ROUTES = {
     "Nairobi → Eldoret": {"label": "NBO→EDL"},
 }
 
+# ── Session State Init ──────────────────────────────────
+if "scraper_logs" not in st.session_state:
+    st.session_state["scraper_logs"] = ""
+
+if "last_run_status" not in st.session_state:
+    st.session_state["last_run_status"] = None
+
 # ── Scraper Runner ──────────────────────────────────────
 def run_scraper(route_label, selected_date):
     env = os.environ.copy()
@@ -52,25 +59,21 @@ def load_data():
     if df.empty:
         return df
 
-    # Clean numeric fields
     df["price_kes"] = pd.to_numeric(df.get("price_kes", 0), errors="coerce").fillna(0)
     df["price_usd"] = pd.to_numeric(df.get("price_usd", 0), errors="coerce").fillna(0)
     df["stops"] = pd.to_numeric(df.get("stops", 0), errors="coerce").fillna(0)
 
-    # Format time
     df["departure_time"] = pd.to_datetime(df["departure_time"], errors="coerce").dt.strftime("%H:%M")
     df["arrival_time"] = pd.to_datetime(df["arrival_time"], errors="coerce").dt.strftime("%H:%M")
 
-    # Normalize date properly
     df["flight_date"] = pd.to_datetime(df["flight_date"], errors="coerce").dt.date
 
     return df
 
 # ── UI ──────────────────────────────────────────────────
-st.markdown("# ✈ Kenya Flights Search")
-st.caption("Real-time flight search (Powered by scraper)")
+st.title("✈ Kenya Flights Search")
+st.caption("Live scraping via Playwright (Streamlit Cloud)")
 
-# Inputs
 col1, col2 = st.columns(2)
 
 with col1:
@@ -86,26 +89,36 @@ with col2:
 
 route_label = ROUTES[selected_route]["label"]
 
-# ── Scraper Trigger Button ──────────────────────────────
+# ── Scraper Button ──────────────────────────────────────
 if st.button("🔄 Fetch Latest Flights"):
-    with st.spinner("Scraping flights... this may take 30–90 seconds ⏳"):
+
+    with st.spinner("Scraping flights... (30–90s) ⏳"):
 
         result = run_scraper(route_label, selected_date)
 
-        if result.returncode == 0:
-            st.success("✅ Flights updated successfully!")
-        else:
-            st.error("❌ Scraper failed — check logs below 👇")
+        # Save logs persistently
+        st.session_state["scraper_logs"] = (
+            f"RETURN CODE: {result.returncode}\n\n"
+            f"STDOUT:\n{result.stdout}\n\n"
+            f"STDERR:\n{result.stderr}"
+        )
 
-        st.write("Return code:", result.returncode)
+        st.session_state["last_run_status"] = result.returncode
 
-        # ✅ SHOW LOGS HERE (inside block)
-        with st.expander("📄 Scraper Logs"):
-            st.text(result.stdout)
-            st.text(result.stderr)
-
+        # Clear cache so new CSV loads
         st.cache_data.clear()
-        st.rerun()
+
+# ── Show Status ─────────────────────────────────────────
+if st.session_state["last_run_status"] == 0:
+    st.success("✅ Flights updated successfully!")
+
+elif st.session_state["last_run_status"] is not None:
+    st.error("❌ Scraper failed — check logs below")
+
+# ── Persistent Logs ─────────────────────────────────────
+if st.session_state["scraper_logs"]:
+    with st.expander("📄 Scraper Logs (click to view)"):
+        st.text(st.session_state["scraper_logs"])
 
 # ── Load Data ───────────────────────────────────────────
 df = load_data()
@@ -120,11 +133,11 @@ with st.expander("🛠 Debug Info"):
 
     if not df.empty:
         st.write("Preview:", df.head())
-        st.write("Available routes:", df["route"].unique())
+        st.write("Routes in data:", df["route"].unique())
     else:
-        st.warning("No data loaded yet")
+        st.warning("No data loaded")
 
-# ── Filter Data ─────────────────────────────────────────
+# ── Filter ──────────────────────────────────────────────
 if not df.empty:
     filtered = df[
         (df["route"] == route_label) &
@@ -152,8 +165,7 @@ else:
     cheapest_price = filtered["price_kes"].min()
 
     for _, row in filtered.iterrows():
-        is_cheapest = row["price_kes"] == cheapest_price
-        badge = "🟢 BEST PRICE" if is_cheapest else ""
+        badge = "🟢 BEST PRICE" if row["price_kes"] == cheapest_price else ""
 
         st.markdown(f"""
         ### ✈ {row.get('airline', 'Unknown')} {badge}
@@ -176,5 +188,4 @@ if refresh:
     st.rerun()
 
 # ── Footer ─────────────────────────────────────────────
-
 st.caption(f"Last updated: {time.strftime('%H:%M:%S')}")

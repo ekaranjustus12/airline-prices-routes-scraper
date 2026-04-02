@@ -215,7 +215,7 @@ def load_data() -> pd.DataFrame:
     df["duration_mins"]  = pd.to_numeric(df["duration_mins"], errors="coerce")
     df["departure_time"] = df["departure_time"].astype(str).str.strip().replace("nan", "")
     df["arrival_time"]   = df["arrival_time"].astype(str).str.strip().replace("nan", "")
-    df["flight_date"] = pd.to_datetime(df["flight_date"], errors="coerce")
+    df["flight_date"] = df["flight_date"].astype(str).str.strip()
     return df.fillna("")
 
 
@@ -228,9 +228,9 @@ def render_card(row: dict, is_best: bool, route_info: dict):
     stops     = int(row.get("stops", 0))
     price_kes = int(row.get("price_kes", 0))
     price_usd = int(float(row.get("price_usd", 0)))
-    fdate_raw = row.get("flight_date")
+    fdate = row.get("flight_date", "")
     try:
-      fdate = pd.to_datetime(fdate_raw).strftime("%-d %B, %H:%M")
+      fdate = pd.to_datetime().strftime("%-d %B, %H:%M")
     except:
       fdate = "—"
 

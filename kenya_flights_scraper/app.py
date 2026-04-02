@@ -21,16 +21,16 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 #MainMenu, footer, header { visibility: hidden; }
-.block-container { padding: 2rem 2rem 2rem 2rem; max-width: 800px; }
+.block-container { padding: 1rem 1rem 2rem 1rem; max-width: 800px; }
 
 /* ── Header ── */
 .page-header {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 20px 0 24px 0;
+    padding: 16px 0 20px 0;
     border-bottom: 1px solid rgba(128,128,128,0.25);
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 }
 .page-header-icon {
     width: 44px; height: 44px;
@@ -57,17 +57,28 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     text-align: right;
     font-size: 12px;
     color: rgba(128,128,128,0.75);
-    line-height: 1.5;
+    line-height: 1.6;
+    flex-shrink: 0;
 }
-.data-freshness strong { color: inherit; font-weight: 600; }
+.data-freshness .freshness-time {
+    font-size: 15px;
+    font-weight: 700;
+    color: inherit;
+    display: block;
+}
+.data-freshness .freshness-date {
+    font-size: 11px;
+    color: rgba(128,128,128,0.7);
+    display: block;
+}
 
 /* ── Search panel ── */
 .search-panel {
     background: rgba(128,128,128,0.07);
     border: 1px solid rgba(128,128,128,0.2);
     border-radius: 14px;
-    padding: 1.25rem 1.4rem;
-    margin-bottom: 1.5rem;
+    padding: 1.1rem 1.2rem;
+    margin-bottom: 1.25rem;
 }
 
 /* ── Flight card ── */
@@ -75,61 +86,110 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     background: rgba(128,128,128,0.06);
     border: 1px solid rgba(128,128,128,0.2);
     border-radius: 14px;
-    padding: 1.1rem 1.4rem;
+    padding: 1rem 1.1rem;
     margin-bottom: 10px;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.15s;
 }
-.flight-card:hover { border-color: #d1d5db; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
 .flight-card.best-card { border: 1.5px solid #0F6E56; }
 
-.card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-.airline-row { display:flex; align-items:center; gap:10px; }
-.airline-logo {
-    width: 36px; height: 36px; border-radius: 9px;
-    background: #f3f4f6; border: 1px solid #e5e7eb;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 700; color: #4b5563;
+/* card top: airline + badge */
+.card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 8px;
 }
-.airline-name { font-size: 15px; font-weight: 600; color: inherit; }
-.airline-date { font-size: 12px; color: rgba(128,128,128,0.85); margin-top: 2px; }
+.airline-row { display:flex; align-items:center; gap:10px; min-width:0; }
+.airline-logo {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: rgba(128,128,128,0.15);
+    border: 1px solid rgba(128,128,128,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: inherit;
+    flex-shrink: 0;
+}
+.airline-name {
+    font-size: 14px; font-weight: 600; color: inherit;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.airline-date { font-size: 11px; color: rgba(128,128,128,0.85); margin-top: 1px; }
 .best-badge {
-    font-size: 11px; font-weight: 600;
-    padding: 4px 10px; border-radius: 20px;
+    font-size: 10px; font-weight: 600;
+    padding: 3px 8px; border-radius: 20px;
     background: #E1F5EE; color: #0F6E56;
     border: 1px solid #9FE1CB;
-    white-space: nowrap;
+    white-space: nowrap; flex-shrink: 0;
 }
 
-.time-row { display:flex; align-items:center; margin-bottom:14px; }
-.time-block .time { font-size: 24px; font-weight: 700; color: inherit; line-height: 1; }
-.time-block .iata { font-size: 11px; color: rgba(128,128,128,0.85); margin-top: 3px; letter-spacing: 0.05em; }
-.route-line { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; padding:0 16px; }
+/* time row */
+.time-row { display:flex; align-items:center; margin-bottom:12px; }
+.time-block .time {
+    font-size: 22px; font-weight: 700; color: inherit; line-height: 1;
+}
+.time-block .iata {
+    font-size: 11px; color: rgba(128,128,128,0.85);
+    margin-top: 3px; letter-spacing: 0.05em;
+}
+.route-line {
+    flex: 1; display:flex; flex-direction:column;
+    align-items:center; gap:5px; padding: 0 10px;
+}
 .route-bar-wrap { width:100%; display:flex; align-items:center; }
-.dot { width:5px; height:5px; border-radius:50%; background:#d1d5db; flex-shrink:0; }
-.bar { flex:1; height:1px; background:#e5e7eb; }
-.route-meta { display:flex; align-items:center; gap:8px; }
-.duration { font-size: 11px; color: #9ca3af; }
-.stops-pill { font-size:11px; padding:2px 9px; border-radius:20px; background:#f3f4f6; border:1px solid #e5e7eb; color:#6b7280; }
-.stops-pill.direct { background:#EAF3DE; border-color:#C0DD97; color:#3B6D11; font-weight:500; }
+.dot { width:5px; height:5px; border-radius:50%; background:rgba(128,128,128,0.4); flex-shrink:0; }
+.bar { flex:1; height:1px; background:rgba(128,128,128,0.25); }
+.route-meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:center; }
+.duration { font-size: 10px; color: rgba(128,128,128,0.75); }
+.stops-pill {
+    font-size: 10px; padding: 2px 7px; border-radius: 20px;
+    background: rgba(128,128,128,0.12);
+    border: 1px solid rgba(128,128,128,0.2);
+    color: rgba(128,128,128,0.9);
+}
+.stops-pill.direct {
+    background: #EAF3DE; border-color: #C0DD97; color: #3B6D11; font-weight: 500;
+}
 
-.card-bottom { display:flex; align-items:center; justify-content:space-between; padding-top:12px; border-top:1px solid #f3f4f6; }
+/* card bottom: price */
+.card-bottom {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid rgba(128,128,128,0.15);
+}
 .price-kes { font-size: 20px; font-weight: 700; color: inherit; }
-.price-usd { font-size: 12px; color: rgba(128,128,128,0.75); margin-top: 2px; }
+.price-usd { font-size: 11px; color: rgba(128,128,128,0.75); margin-top: 2px; }
+
+/* ── Mobile: stack time row vertically on small screens ── */
+@media (max-width: 480px) {
+    .block-container { padding: 0.75rem 0.5rem 2rem 0.5rem !important; }
+    .page-header-text h1 { font-size: 18px; }
+    .time-block .time { font-size: 20px; }
+    .time-row { gap: 4px; }
+    .route-line { padding: 0 6px; }
+    .price-kes { font-size: 18px; }
+    .flight-card { padding: 0.85rem 0.9rem; }
+    .data-freshness .freshness-time { font-size: 13px; }
+}
 
 /* ── Empty state ── */
-.empty-state { text-align:center; padding:3.5rem 1rem; background:rgba(128,128,128,0.06); border:1px solid rgba(128,128,128,0.2); border-radius:14px; }
+.empty-state {
+    text-align: center; padding: 3rem 1rem;
+    background: rgba(128,128,128,0.06);
+    border: 1px solid rgba(128,128,128,0.2);
+    border-radius: 14px;
+}
 .empty-state h3 { font-size:16px; font-weight:600; color:inherit; margin-bottom:6px; }
 .empty-state p  { font-size:13px; color:rgba(128,128,128,0.75); margin:0; }
 
 /* ── Summary row ── */
-.results-meta { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.results-count { font-size:13px; color:#6b7280; }
+.results-meta { margin-bottom: 10px; }
+.results-count { font-size: 12px; color: rgba(128,128,128,0.75); }
 
 /* Tighten Streamlit widget labels */
 label[data-testid="stWidgetLabel"] {
     font-size: 11px !important;
     font-weight: 600 !important;
-    color: #6b7280 !important;
+    color: rgba(128,128,128,0.8) !important;
     text-transform: uppercase;
     letter-spacing: 0.06em;
 }
@@ -225,22 +285,28 @@ def render_card(row: dict, is_best: bool, route_info: dict):
 # ── Load data ─────────────────────────────────────────────────────────────────
 df = load_data()
 
-# Work out when the CSV was last updated
+# Format last_scraped as time + date on separate lines
+freshness_html = ""
 if not df.empty and "date_scraped" in df.columns:
-    last_scraped = df["date_scraped"].max()
-else:
-    last_scraped = None
+    try:
+        raw = df["date_scraped"].max()
+        ts  = pd.to_datetime(raw)
+        t   = ts.strftime("%H:%M")               # "14:00"
+        d   = ts.strftime("%d %B").lstrip("0")   # "2 April" (strip leading zero)
+        freshness_html = f'''
+        <div class="data-freshness">
+          <span class="freshness-time">{t}</span>
+          <span class="freshness-date">{d}</span>
+        </div>'''
+    except Exception:
+        freshness_html = ""
 
 # ── Header ────────────────────────────────────────────────────────────────────
-freshness_html = (
-    f'<div class="data-freshness">Data updated<br><strong>{last_scraped}</strong></div>'
-    if last_scraped else ""
-)
 st.markdown(f"""
 <div class="page-header">
   <div class="page-header-icon">✈</div>
   <div class="page-header-text">
-    <h1>Kenya Flights</h1>
+    <h1>Domestic Flights</h1>
     <p>Domestic fare prices — NBO routes</p>
   </div>
   {freshness_html}

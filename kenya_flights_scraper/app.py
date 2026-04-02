@@ -6,7 +6,7 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
-st.set_page_config(page_title="Domesric Flights", page_icon="✈", layout="wide")
+st.set_page_config(page_title="Kenya Flights", page_icon="✈", layout="wide")
 
 CSV_FILE = Path(__file__).parent / "kenya_flights_esky.csv"
 
@@ -215,7 +215,7 @@ def load_data() -> pd.DataFrame:
     df["duration_mins"]  = pd.to_numeric(df["duration_mins"], errors="coerce")
     df["departure_time"] = df["departure_time"].astype(str).str.strip().replace("nan", "")
     df["arrival_time"]   = df["arrival_time"].astype(str).str.strip().replace("nan", "")
-    df["flight_date"] = df["flight_date"].astype(str).str.strip()
+    df["flight_date"]    = df["flight_date"].astype(str).str.strip()
     return df.fillna("")
 
 
@@ -228,11 +228,13 @@ def render_card(row: dict, is_best: bool, route_info: dict):
     stops     = int(row.get("stops", 0))
     price_kes = int(row.get("price_kes", 0))
     price_usd = int(float(row.get("price_usd", 0)))
-    fdate = row.get("flight_date", "")
+    fdate     = row.get("flight_date", "")
+
     try:
-      fdate = pd.to_datetime().strftime("%-d %B, %H:%M")
-    except:
-      fdate = "—"
+        dm = int(float(row.get("duration_mins") or 0))
+        dur_label = f"{dm//60}h {dm%60:02d}m" if dm >= 60 else (f"{dm}m" if dm else "—")
+    except Exception:
+        dur_label = "—"
 
     stops_class = "stops-pill direct" if stops == 0 else "stops-pill"
     stops_label = "Direct" if stops == 0 else f"{stops} stop{'s' if stops > 1 else ''}"
@@ -287,29 +289,15 @@ df = load_data()
 freshness_html = ""
 if not df.empty and "date_scraped" in df.columns:
     try:
-        raw = df["date_scraped"].max()          # e.g. "2026-04-02" or "2026-04-02T14:00:00"
-        ts  = pd.to_datetime(raw)
-        # Only show time if it's actually set (not midnight 00:00)
-        if ts.hour == 0 and ts.minute == 0:
-            time_str = ""
-            date_str = ts.strftime("%d %B %Y").lstrip("0")   # "2 April 2026"
-        else:
-            time_str = ts.strftime("%H:%M")                   # "14:00"
-            date_str = ts.strftime("%d %B").lstrip("0")       # "2 April"
-        # No leading spaces — indented strings render as code blocks in markdown
-        if time_str:
-            freshness_html = (
-                '<div class="data-freshness">'
-                f'<span class="freshness-time">{time_str}</span>'
-                f'<span class="freshness-date">{date_str}</span>'
-                '</div>'
-            )
-        else:
-            freshness_html = (
-                '<div class="data-freshness">'
-                f'<span class="freshness-time">{date_str}</span>'
-                '</div>'
-            )
+        ts       = pd.to_datetime(df["date_scraped"].max())
+        time_str = ts.strftime("%H:%M")                       # "18:10"
+        date_str = ts.strftime("%d %B").lstrip("0")           # "2 April"
+        freshness_html = (
+            '<div class="data-freshness">'
+            f'<span class="freshness-time">{time_str}</span>'
+            f'<span class="freshness-date">{date_str}</span>'
+            '</div>'
+        )
     except Exception:
         freshness_html = ""
 
@@ -318,7 +306,7 @@ st.markdown(f"""
 <div class="page-header">
   <div class="page-header-icon">✈</div>
   <div class="page-header-text">
-    <h1>Domestic Flights</h1>
+    <h1>Kenya Flights</h1>
     <p>Domestic fare prices — NBO routes</p>
   </div>
   {freshness_html}

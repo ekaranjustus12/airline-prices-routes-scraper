@@ -29,7 +29,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     align-items: center;
     gap: 12px;
     padding: 20px 0 24px 0;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid rgba(128,128,128,0.25);
     margin-bottom: 24px;
 }
 .page-header-icon {
@@ -43,28 +43,28 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .page-header-text h1 {
     font-size: 22px;
     font-weight: 700;
-    color: #0f0f0f;
+    color: inherit;
     margin: 0;
     line-height: 1.2;
 }
 .page-header-text p {
     font-size: 13px;
-    color: #6b7280;
+    color: rgba(128,128,128,0.85);
     margin: 3px 0 0 0;
 }
 .data-freshness {
     margin-left: auto;
     text-align: right;
     font-size: 12px;
-    color: #9ca3af;
+    color: rgba(128,128,128,0.75);
     line-height: 1.5;
 }
-.data-freshness strong { color: #374151; font-weight: 500; }
+.data-freshness strong { color: inherit; font-weight: 600; }
 
 /* ── Search panel ── */
 .search-panel {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
+    background: rgba(128,128,128,0.07);
+    border: 1px solid rgba(128,128,128,0.2);
     border-radius: 14px;
     padding: 1.25rem 1.4rem;
     margin-bottom: 1.5rem;
@@ -72,8 +72,8 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
 /* ── Flight card ── */
 .flight-card {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
+    background: rgba(128,128,128,0.06);
+    border: 1px solid rgba(128,128,128,0.2);
     border-radius: 14px;
     padding: 1.1rem 1.4rem;
     margin-bottom: 10px;
@@ -90,8 +90,8 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     display: flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 700; color: #4b5563;
 }
-.airline-name { font-size: 15px; font-weight: 600; color: #111827; }
-.airline-date { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+.airline-name { font-size: 15px; font-weight: 600; color: inherit; }
+.airline-date { font-size: 12px; color: rgba(128,128,128,0.85); margin-top: 2px; }
 .best-badge {
     font-size: 11px; font-weight: 600;
     padding: 4px 10px; border-radius: 20px;
@@ -101,8 +101,8 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 }
 
 .time-row { display:flex; align-items:center; margin-bottom:14px; }
-.time-block .time { font-size: 24px; font-weight: 700; color: #111827; line-height: 1; }
-.time-block .iata { font-size: 11px; color: #9ca3af; margin-top: 3px; letter-spacing: 0.05em; }
+.time-block .time { font-size: 24px; font-weight: 700; color: inherit; line-height: 1; }
+.time-block .iata { font-size: 11px; color: rgba(128,128,128,0.85); margin-top: 3px; letter-spacing: 0.05em; }
 .route-line { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; padding:0 16px; }
 .route-bar-wrap { width:100%; display:flex; align-items:center; }
 .dot { width:5px; height:5px; border-radius:50%; background:#d1d5db; flex-shrink:0; }
@@ -113,13 +113,13 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .stops-pill.direct { background:#EAF3DE; border-color:#C0DD97; color:#3B6D11; font-weight:500; }
 
 .card-bottom { display:flex; align-items:center; justify-content:space-between; padding-top:12px; border-top:1px solid #f3f4f6; }
-.price-kes { font-size: 20px; font-weight: 700; color: #111827; }
-.price-usd { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+.price-kes { font-size: 20px; font-weight: 700; color: inherit; }
+.price-usd { font-size: 12px; color: rgba(128,128,128,0.75); margin-top: 2px; }
 
 /* ── Empty state ── */
-.empty-state { text-align:center; padding:3.5rem 1rem; background:#f9fafb; border:1px solid #e5e7eb; border-radius:14px; }
-.empty-state h3 { font-size:16px; font-weight:600; color:#374151; margin-bottom:6px; }
-.empty-state p  { font-size:13px; color:#9ca3af; margin:0; }
+.empty-state { text-align:center; padding:3.5rem 1rem; background:rgba(128,128,128,0.06); border:1px solid rgba(128,128,128,0.2); border-radius:14px; }
+.empty-state h3 { font-size:16px; font-weight:600; color:inherit; margin-bottom:6px; }
+.empty-state p  { font-size:13px; color:rgba(128,128,128,0.75); margin:0; }
 
 /* ── Summary row ── */
 .results-meta { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }

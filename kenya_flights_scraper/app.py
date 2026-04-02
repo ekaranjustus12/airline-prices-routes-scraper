@@ -285,19 +285,33 @@ def render_card(row: dict, is_best: bool, route_info: dict):
 # ── Load data ─────────────────────────────────────────────────────────────────
 df = load_data()
 
-# Format last_scraped as time + date on separate lines
+# Format the last-scraped timestamp for the header
 freshness_html = ""
 if not df.empty and "date_scraped" in df.columns:
     try:
-        raw = df["date_scraped"].max()
+        raw = df["date_scraped"].max()          # e.g. "2026-04-02" or "2026-04-02T14:00:00"
         ts  = pd.to_datetime(raw)
-        t   = ts.strftime("%H:%M")               # "14:00"
-        d   = ts.strftime("%d %B").lstrip("0")   # "2 April" (strip leading zero)
-        freshness_html = f'''
-        <div class="data-freshness">
-          <span class="freshness-time">{t}</span>
-          <span class="freshness-date">{d}</span>
-        </div>'''
+        # Only show time if it's actually set (not midnight 00:00)
+        if ts.hour == 0 and ts.minute == 0:
+            time_str = ""
+            date_str = ts.strftime("%d %B %Y").lstrip("0")   # "2 April 2026"
+        else:
+            time_str = ts.strftime("%H:%M")                   # "14:00"
+            date_str = ts.strftime("%d %B").lstrip("0")       # "2 April"
+        # No leading spaces — indented strings render as code blocks in markdown
+        if time_str:
+            freshness_html = (
+                '<div class="data-freshness">'
+                f'<span class="freshness-time">{time_str}</span>'
+                f'<span class="freshness-date">{date_str}</span>'
+                '</div>'
+            )
+        else:
+            freshness_html = (
+                '<div class="data-freshness">'
+                f'<span class="freshness-time">{date_str}</span>'
+                '</div>'
+            )
     except Exception:
         freshness_html = ""
 
@@ -306,7 +320,7 @@ st.markdown(f"""
 <div class="page-header">
   <div class="page-header-icon">✈</div>
   <div class="page-header-text">
-    <h1>Domestic Flights</h1>
+    <h1>Kenya Flights</h1>
     <p>Domestic fare prices — NBO routes</p>
   </div>
   {freshness_html}

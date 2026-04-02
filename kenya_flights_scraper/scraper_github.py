@@ -10,7 +10,7 @@ import asyncio
 import re
 import sys
 import pandas as pd
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from playwright.async_api import async_playwright
 
@@ -103,7 +103,7 @@ async def fetch_for_date(context, search, flight_date):
 
 def parse_json(captured, search, flight_date):
     flights   = []
-    today_str = str(date.today())
+    today_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     for cap in captured:
         data     = cap["data"]
         key      = cap["key"]
@@ -146,7 +146,7 @@ def parse_json(captured, search, flight_date):
 
 async def scrape_html(page, search, flight_date):
     flights   = []
-    today_str = str(date.today())
+    today_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     await page.wait_for_timeout(6000)
 
     cards = []

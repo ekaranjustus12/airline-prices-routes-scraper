@@ -6,7 +6,7 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
-st.set_page_config(page_title="Kenya Flights", page_icon="✈", layout="wide")
+st.set_page_config(page_title="Domesric Flights", page_icon="✈", layout="wide")
 
 CSV_FILE = Path(__file__).parent / "kenya_flights_esky.csv"
 
@@ -215,7 +215,7 @@ def load_data() -> pd.DataFrame:
     df["duration_mins"]  = pd.to_numeric(df["duration_mins"], errors="coerce")
     df["departure_time"] = df["departure_time"].astype(str).str.strip().replace("nan", "")
     df["arrival_time"]   = df["arrival_time"].astype(str).str.strip().replace("nan", "")
-    df["flight_date"]    = df["flight_date"].astype(str).str.strip()
+    df["flight_date"] = pd.to_datetime(df["flight_date"], errors="coerce")
     return df.fillna("")
 
 
@@ -228,13 +228,11 @@ def render_card(row: dict, is_best: bool, route_info: dict):
     stops     = int(row.get("stops", 0))
     price_kes = int(row.get("price_kes", 0))
     price_usd = int(float(row.get("price_usd", 0)))
-    fdate     = row.get("flight_date", "")
-
+    fdate_raw = row.get("flight_date")
     try:
-        dm = int(float(row.get("duration_mins") or 0))
-        dur_label = f"{dm//60}h {dm%60:02d}m" if dm >= 60 else (f"{dm}m" if dm else "—")
-    except Exception:
-        dur_label = "—"
+      fdate = pd.to_datetime(fdate_raw).strftime("%-d %B, %H:%M")
+    except:
+      fdate = "—"
 
     stops_class = "stops-pill direct" if stops == 0 else "stops-pill"
     stops_label = "Direct" if stops == 0 else f"{stops} stop{'s' if stops > 1 else ''}"
@@ -320,7 +318,7 @@ st.markdown(f"""
 <div class="page-header">
   <div class="page-header-icon">✈</div>
   <div class="page-header-text">
-    <h1>Kenya Flights</h1>
+    <h1>Domestic Flights</h1>
     <p>Domestic fare prices — NBO routes</p>
   </div>
   {freshness_html}

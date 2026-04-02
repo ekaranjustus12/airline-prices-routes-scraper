@@ -6,7 +6,7 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
-st.set_page_config(page_title="Kenya Flights", page_icon="✈", layout="wide")
+st.set_page_config(page_title="Domestic Flights(Kenya)", page_icon="✈", layout="wide")
 
 CSV_FILE = Path(__file__).parent / "kenya_flights_esky.csv"
 
@@ -306,7 +306,7 @@ st.markdown(f"""
 <div class="page-header">
   <div class="page-header-icon">✈</div>
   <div class="page-header-text">
-    <h1>Kenya Flights</h1>
+    <h1>Domestic Flights</h1>
     <p>Domestic fare prices — NBO routes</p>
   </div>
   {freshness_html}

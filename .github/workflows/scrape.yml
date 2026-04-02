@@ -2,12 +2,15 @@ name: Scrape Kenya Flights
 
 on:
   schedule:
-    - cron: '0 4,16 * * *'   # runs at 04:00 and 16:00 UTC daily (7am & 7pm Nairobi)
-  workflow_dispatch:           # also allows manual trigger from GitHub Actions tab
+    - cron: '0 4,16 * * *'
+  workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write       # ← this is what was missing — allows the job to push commits
 
     steps:
       - name: Checkout repo
